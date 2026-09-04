@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Dark Atmosphere Generator</title>
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:radial-gradient(1200px 700px at 70% -10%,#1e1b4b 0%,#0b1220 55%);color:#e5e7eb;min-height:100vh}
+main{max-width:1100px;margin:0 auto;padding:56px 20px 80px}
+header h1{font-size:clamp(2rem,5vw,3.4rem);margin:0 0 12px;letter-spacing:-.03em;background:linear-gradient(90deg,#c4b5fd,#818cf8,#0ea5e9);-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{color:#94a3b8;max-width:640px;margin:0 0 36px;font-size:1.05rem;line-height:1.6}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-bottom:24px}
+.field,.switch{background:rgba(15,23,42,.75);border:1px solid #1e293b;border-radius:18px;padding:18px}
+label{display:block;font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;margin-bottom:10px}
+select,input[type=number]{width:100%;padding:11px 12px;border-radius:12px;border:1px solid #273449;background:#0b1220;color:#e5e7eb;font-size:.95rem;outline:none}
+select:focus,input[type=number]:focus{border-color:#818cf8}
+input[type=range]{width:100%;accent-color:#818cf8}
+.value{float:right;color:#c4b5fd;font-weight:600}
+.toggle{display:flex;align-items:center;gap:12px;cursor:pointer;font-size:.9rem;color:#e2e8f0;text-transform:none;letter-spacing:0}
+.toggle input{width:1.1rem;height:1.1rem;accent-color:#818cf8}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+button{padding:13px 18px;border:0;border-radius:14px;font-weight:700;cursor:pointer;font-size:.95rem;transition:filter .15s ease,transform .15s ease}
+button:hover{filter:brightness(1.08)}
+button:active{transform:translateY(1px)}
+.primary{background:#818cf8;color:#0b1220}
+.ghost{background:#1e293b;color:#e2e8f0}
+.status{display:flex;align-items:center;gap:14px;color:#94a3b8;font-size:.9rem;margin-bottom:8px}
+canvas{width:100%;height:120px;border-radius:18px;border:1px solid #1e293b;background:rgba(2,6,23,.7)}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>Dark Atmosphere Generator</h1>
+<p>Create slowly evolving pads, drones, and air in your chosen key. Trigger atmospheres manually or let them appear automatically after each couple of phrases.</p>
+</header>
+
+<section class='controls'>
+<div class='field'>
+<label>Key</label>
+<select id='key'>
+<option value='0'>C</option><option value='1'>C#</option><option value='2'>D</option><option value='3'>D#</option><option value='4'>E</option><option value='5'>F</option><option value='6'>F#</option><option value='7'>G</option><option value='8'>G#</option><option value='9'>A</option><option value='10'>A#</option><option value='11'>B</option>
+</select>
+</div>
+<div class='field'>
+<label>Scale</label>
+<select id='scale'>
+<option value='minor'>Natural Minor</option>
+<option value='harmonicMinor'>Harmonic Minor</option>
+<option value='phrygian'>Phrygian</option>
+<option value='locrian'>Locrian</option>
+</select>
+</div>
+<div class='field'>
+<label>Phrase length <span class='value' id='phraseLenVal'>8s</span></label>
+<input type='range' id='phraseLen' min='4' max='24' value='8' step='1'>
+</div>
+<div class='field'>
+<label>Phrases between atmospheres</label>
+<input type='number' id='phrasesBetween' min='1' max='16' value='2'>
+</div>
+<div class='field'>
+<label>Total phrases <span class='value' id='totalPhrasesVal'>8</span></label>
+<input type='number' id='totalPhrases' min='1' max='128' value='8'>
+</div>
+<div class='field'>
+<label>Output format</label>
+<select id='outputFormat'>
+<option value='wav'>WAV</option>
+<option value='mp3'>MP3</option>
+</select>
+</div>
+<div class='switch'>
+<label class='toggle'><input type='checkbox' id='autoToggle'> Auto-generate after each couple of phrases</label>
+</div>
+</section>
+
+<div class='actions'>
+<button class='primary' id='triggerBtn'>Generate Atmosphere Now</button>
+<button class='primary' id='exportBtn'>Export Composition</button>
+<button class='ghost' id='stopBtn'>Stop All</button>
+</div>
+
+<div class='status'><span id='statusText'>Ready</span><span id='countdown'></span></div>
+<canvas id='visual' width='1000' height='120'></canvas>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const keySel=$('key'),scaleSel=$('scale'),phraseLen=$('phraseLen'),phraseLenVal=$('phraseLenVal'),phrasesBetween=$('phrasesBetween'),totalPhrases=$('totalPhrases'),totalPhrasesVal=$('totalPhrasesVal'),outputFormat=$('outputFormat'),autoToggle=$('autoToggle'),triggerBtn=$('triggerBtn'),exportBtn=$('exportBtn'),stopBtn=$('stopBtn'),statusText=$('statusText'),countdown=$('countdown'),canvas=$('visual');
+const ctx2d=canvas.getContext('2d');
+let audioCtx=null,master=null,analyser=null,delay=null,feedback=null;
+let activeSources=[],autoTimer=null,countdownTimer=null,nextEventAt=0;
+const scales={
+minor:[0,2,3,5,7,8,10],
+harmonicMinor:[0,2,3,5,7,8,11],
+phrygian:[0,1,3,5,7,8,10],
+locrian:[0,1,3,5,6,8,10]
+};
+function noteHz(midi){return 440*Math.pow(2,(midi-69)/12);}
+function ensureAudio(){
+if(audioCtx)return;
+audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+master=audioCtx.createGain();master.gain.value=0.55;
+analyser=audioCtx.createAnalyser();analyser.fftSize=256;
+delay=audioCtx.createDelay(2.5);delay.delayTime.value=0.55;
+feedback=audioCtx.createGain();feedback.gain.value=0.35;
+master.connect(analyser);master.connect(audioCtx.destination);
+master.connect(delay);delay.connect(feedback);feedback.connect(delay);delay.connect(master);
+draw();
+}
+function updateStatus(text){statusText.textContent=text;}
+function stopAll(){
+activeSources.forEach(s=>{try{s.stop()}catch(e){}});
+activeSources=[];
+updateStatus('Stopped all');
+}
+function scheduleAtmosphere(ctx, target, startTime, rootMidi, intervals){
+const now=startTime;
+const noteCount=5+Math.floor(Math.random()*4);
+const chosen=[];
+for(let i=0;i<noteCount;i++){
+const degree=intervals[Math.floor(Math.random()*intervals.length)];
+const octave=Math.floor(Math.random()*5)-2;
+chosen.push(rootMidi+degree+12*octave);
+}
+const sub=ctx.createOscillator();sub.type='sine';sub.frequency.value=noteHz(rootMidi-12);
+const subGain=ctx.createGain();subGain.gain.setValueAtTime(0,now);subGain.gain.linearRampToValueAtTime(0.22,now+3);subGain.gain.linearRampToValueAtTime(0,now+18);
+sub.connect(subGain);subGain.connect(target);sub.start(now);sub.stop(now+22);
+for(const midi of chosen){
+const osc=ctx.createOscillator();osc.type=Math.random()<0.5?'sine':'triangle';osc.frequency.value=noteHz(midi);osc.detune.value=(Math.random()*18)-9;
+const panner=ctx.createStereoPanner?ctx.createStereoPanner():null;
+const g=ctx.createGain();
+const start=now+Math.random()*2.5;
+const dur=12+Math.random()*14;
+g.gain.setValueAtTime(0,start);
+g.gain.linearRampToValueAtTime(0.07+Math.random()*0.1,start+2);
+g.gain.linearRampToValueAtTime(0,start+dur);
+osc.connect(g);
+if(panner){panner.pan.value=(Math.random()*2)-1;g.connect(panner);panner.connect(target);}else{g.connect(target);}
+osc.start(start);osc.stop(start+dur+0.1);
+}
+const noiseLen=2*ctx.sampleRate;
+const buffer=ctx.createBuffer(1,noiseLen,ctx.sampleRate);
+const data=buffer.getChannelData(0);
+for(let i=0;i<noiseLen;i++)data[i]=Math.random()*2-1;
+const noise=ctx.createBufferSource();noise.buffer=buffer;noise.loop=true;
+const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=700+Math.random()*900;
+const ng=ctx.createGain();
+const nStart=now+1;const nDur=10+Math.random()*9;
+ng.gain.setValueAtTime(0,nStart);ng.gain.linearRampToValueAtTime(0.03,nStart+3);ng.gain.linearRampToValueAtTime(0,nStart+nDur);
+noise.connect(lp);lp.connect(ng);ng.connect(target);noise.start(nStart);noise.stop(nStart+nDur+0.1);
+}
+function generateAtmosphere(){
+ensureAudio();
+if(audioCtx.state==='suspended')audioCtx.resume();
+const now=audioCtx.currentTime;
+const rootMidi=48+parseInt(keySel.value,10);
+const intervals=scales[scaleSel.value]||scales.minor;
+scheduleAtmosphere(audioCtx,master,now,rootMidi,intervals);
+updateStatus('Atmosphere generated at '+new Date().toLocaleTimeString());
+}
+function updateCountdown(){
+if(!autoToggle.checked){countdown.textContent='';return;}
+const remain=Math.max(0,nextEventAt-Date.now());
+countdown.textContent='Next atmosphere in '+Math.ceil(remain/1000)+'s';
+}
+function scheduleNext(){
+if(autoTimer)clearTimeout(autoTimer);
+if(countdownTimer)clearInterval(countdownTimer);
+if(!autoToggle.checked){countdown.textContent='';return;}
+const phraseSeconds=parseFloat(phraseLen.value)||8;
+const phrases=Math.max(1,parseInt(phrasesBetween.value,10)||2);
+const interval=phraseSeconds*phrases*1000;
+nextEventAt=Date.now()+interval;
+autoTimer=setTimeout(()=>{generateAtmosphere();scheduleNext();},interval);
+updateCountdown();
+countdownTimer=setInterval(updateCountdown,250);
+}
+triggerBtn.onclick=()=>{generateAtmosphere();if(autoToggle.checked)scheduleNext();};
+stopBtn.onclick=stopAll;
+autoToggle.onchange=()=>{if(autoToggle.checked){scheduleNext();}else{clearTimeout(autoTimer);clearInterval(countdownTimer);countdown.textContent='';}};
+phraseLen.oninput=()=>{phraseLenVal.textContent=phraseLen.value+'s';if(autoToggle.checked)scheduleNext();};
+totalPhrases.oninput=()=>{totalPhrasesVal.textContent=totalPhrases.value;};
+phrasesBetween.onchange=()=>{if(autoToggle.checked)scheduleNext();};
+
+function audioBufferToWav(buffer){
+const numChannels=buffer.numberOfChannels,sampleRate=buffer.sampleRate;
+const numFrames=buffer.length,bytesPerSample=2,blockAlign=numChannels*bytesPerSample;
+const dataSize=numFrames*blockAlign,bufferSize=44+dataSize;
+const arrayBuffer=new ArrayBuffer(bufferSize);
+const view=new DataView(arrayBuffer);
+function writeStr(offset,str){for(let i=0;i<str.length;i++)view.setUint8(offset+i,str.charCodeAt(i));}
+writeStr(0,'RIFF');view.setUint32(4,36+dataSize,true);writeStr(8,'WAVE');writeStr(12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,numChannels,true);view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate*blockAlign,true);view.setUint16(32,blockAlign,true);view.setUint16(34,16,true);writeStr(36,'data');view.setUint32(40,dataSize,true);
+let offset=44;
+const channels=[];
+for(let c=0;c<numChannels;c++)channels.push(buffer.getChannelData(c));
+for(let i=0;i<numFrames;i++){
+for(let c=0;c<numChannels;c++){
+let sample=Math.max(-1,Math.min(1,channels[c][i]));
+view.setInt16(offset,sample<0?sample*0x8000:sample*0x7FFF,true);
+offset+=2;
+}
+}
+return new Blob([arrayBuffer],{type:'audio/wav'});
+}
+
+async function audioBufferToMp3(buffer){
+if(!window.AudioEncoder||!window.AudioData){throw new Error('MP3 encoding is not supported in this browser.');}
+const sampleRate=buffer.sampleRate;
+const numberOfChannels=buffer.numberOfChannels;
+const numberOfFrames=buffer.length;
+const planar=[];
+for(let c=0;c<numberOfChannels;c++){
+const ch=buffer.getChannelData(c);
+const arr=new Float32Array(numberOfFrames);
+arr.set(ch);
+planar.push(arr);
+}
+const audioData=new AudioData({
+format:'f32-planar',
+sampleRate:44100,
+numberOfFrames,
+numberOfChannels,
+timestamp:0,
+data:planar
+});
+const chunks=[];
+const encoder=new AudioEncoder({
+output:chunk=>{
+const buf=new ArrayBuffer(chunk.byteLength);
+chunk.copyTo(buf);
+chunks.push(new Uint8Array(buf));
+},
+error:e=>{throw e;}
+});
+const config={
+codec:'mp3',
+sampleRate:44100,
+numberOfChannels,
+bitrate:192000
+};
+const support=await AudioEncoder.isConfigSupported(config);
+if(!support.supported){throw new Error('MP3 codec is not supported.');}
+encoder.configure(config);
+encoder.encode(audioData);
+await encoder.flush();
+encoder.close();
+audioData.close();
+let totalLength=0;
+chunks.forEach(c=>totalLength+=c.length);
+const out=new Uint8Array(totalLength);
+let offset=0;
+chunks.forEach(c=>{out.set(c,offset);offset+=c.length;});
+return new Blob([out],{type:'audio/mpeg'});
+}
+
+async function renderComposition(){
+const phraseSeconds=parseFloat(phraseLen.value)||8;
+const total=Math.max(1,parseInt(totalPhrases.value,10)||8);
+const duration=phraseSeconds*total;
+const sampleRate=44100;
+const offline=new OfflineAudioContext(2,Math.ceil(duration*sampleRate),sampleRate);
+const target=offline.createGain();target.gain.value=0.55;
+target.connect(offline.destination);
+const delay=offline.createDelay(2.5);delay.delayTime.value=0.55;
+const fb=offline.createGain();fb.gain.value=0.35;
+target.connect(delay);delay.connect(fb);fb.connect(delay);delay.connect(target);
+const rootMidi=48+parseInt(keySel.value,10);
+const intervals=scales[scaleSel.value]||scales.minor;
+const between=Math.max(1,parseInt(phrasesBetween.value,10)||2);
+let t=0.1;
+while(t<duration-1){
+scheduleAtmosphere(offline,target,t,rootMidi,intervals);
+t+=phraseSeconds*between;
+}
+return await offline.startRendering();
+}
+
+exportBtn.onclick=async()=>{
+try{
+exportBtn.disabled=true;
+updateStatus('Rendering composition...');
+const buffer=await renderComposition();
+const format=outputFormat.value;
+let blob;
+if(format==='mp3'){
+updateStatus('Encoding MP3...');
+blob=await audioBufferToMp3(buffer);
+}else{
+blob=audioBufferToWav(buffer);
+}
+const ext=format==='mp3'?'mp3':'wav';
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;
+a.download='dark-atmosphere.'+ext;
+document.body.appendChild(a);
+a.click();
+a.remove();
+URL.revokeObjectURL(url);
+updateStatus('Exported '+ext.toUpperCase()+' successfully');
+}catch(err){
+updateStatus('Export failed: '+err.message);
+}finally{
+exportBtn.disabled=false;
+}
+};
+
+function draw(){
+requestAnimationFrame(draw);
+if(!analyser)return;
+const w=canvas.width,h=canvas.height;
+ctx2d.clearRect(0,0,w,h);
+const data=new Uint8Array(analyser.frequencyBinCount);
+analyser.getByteFrequencyData(data);
+const bars=72,step=Math.floor(data.length/bars);
+ctx2d.fillStyle='#818cf8';
+for(let i=0;i<bars;i++){
+const v=data[i*step]/255;
+const bh=v*h;
+ctx2d.fillRect(i*(w/bars),h-bh,(w/bars)-2,bh);
+}
+}
+draw();
+</script>
+</body>
+</html>

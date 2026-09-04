@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample Element Synthesizer</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#0b1220;color:#e5e7eb}
+main{max-width:900px;margin:0 auto;padding:48px 20px}
+h1{font-size:1.9rem;margin:0 0 6px}
+p.sub{color:#94a3b8;margin:0 0 28px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.card{background:#111a2e;border:1px solid #1e293b;border-radius:16px;padding:16px}
+label{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;margin-bottom:8px}
+input,select{width:100%;padding:10px;border:1px solid #273449;background:#0b1220;color:#e5e7eb;border-radius:10px}
+button{padding:12px 18px;border:0;border-radius:12px;font-weight:700;cursor:pointer}
+.primary{background:#38bdf8;color:#082f49}
+.secondary{background:#1e293b;color:#e2e8f0}
+.list{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.chip{padding:8px 12px;border-radius:999px;background:#1e293b;color:#e2e8f0;cursor:pointer;border:1px solid transparent}
+.chip.active{background:#0ea5e9;color:#082f49;border-color:#7dd3fc}
+pre{background:#0d1626;border:1px solid #1e293b;border-radius:12px;padding:16px;overflow:auto;white-space:pre-wrap;margin-top:16px}
+</style>
+</head>
+<body>
+<main>
+<h1>Sample Element Synthesizer</h1>
+<p class="sub">Synthesize kick, snare, clap, hi-hat, and bass elements, then export them as 16-bit WAV files.</p>
+<div class="grid">
+<div class="card"><label>Type</label><select id="type">
+<option value="kick">Kick</option>
+<option value="snare">Snare</option>
+<option value="clap">Clap</option>
+<option value="hat">Closed Hat</option>
+<option value="bass">Sub Bass</option>
+</select></div>
+<div class="card"><label>Pitch</label><input id="pitch" type="range" min="0" max="100" value="50"></div>
+<div class="card"><label>Decay</label><input id="decay" type="range" min="0" max="100" value="60"></div>
+<div class="card"><label>Tone</label><input id="tone" type="range" min="0" max="100" value="50"></div>
+</div>
+<div class="list" id="typeList"></div>
+<div style="margin-top:24px"><button class="primary" id="render">Render</button> <button class="secondary" id="preview">Preview</button> <button class="secondary" id="download" disabled>Export .wav</button></div>
+<pre id="out">Select a type and render.</pre>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const types=['kick','snare','clap','hat','bass'];
+let current='kick',rendered=null,ctx=null;
+function buildTypeList(){
+const el=$('typeList');
+el.innerHTML='';
+for(const t of types){
+const b=document.createElement('button');
+b.className='chip'+(t===current?' active':'');
+b.textContent=t;
+b.onclick=()=>{current=t;$('type').value=t;buildTypeList();};
+el.appendChild(b);
+}
+}
+$('type').addEventListener('change',e=>{current=e.target.value;buildTypeList();});
+buildTypeList();
+function makeBuffer(){
+const sr=44100, dur=1.5, len=Math.floor(sr*dur);
+const data=new Float32Array(len);
+const pitch=Number($('pitch').value)/100;
+const decay=Number($('decay').value)/100;
+const tone=Number($('tone').value)/100;
+const p=Math.max(0.0001,1-pitch*0.98);
+const d=Math.max(0.0001,1-decay*0.98);
+const t=Math.max(0,tone);
+for(let i=0;i<len;i++){
+const n=i/sr;
+const env=Math.exp(-n/(0.03+d*0.4));
+let v=0;
+if(current==='kick'){
+const f=40+100*Math.exp(-n/(0.02+p*0.03));
+v=Math.sin(2*Math.PI*f*n)*env;
+}else if(current==='snare'){
+const noise=Math.random()*2-1;
+v=(noise*(1-t)+Math.sin(2*Math.PI*(180+p*220)*n)*t)*env;
+}else if(current==='clap'){
+const noise=Math.random()*2-1;
+const burst=Math.max(0,Math.sin(n*12*Math.PI))*Math.max(0,Math.sin(n*30*Math.PI));
+v=noise*(0.7+0.3*burst)*env;
+}else if(current==='hat'){
+const noise=Math.random()*2-1;
+v=noise*(0.8+0.2*Math.sin(2*Math.PI*(5000+p*3000)*n))*Math.exp(-n/(0.008+d*0.05));
+}else if(current==='bass'){
+v=Math.sin(2*Math.PI*(45+p*180)*n)*env;
+}
+data[i]=v*0.8;
+}
+return data;
+}
+function renderToWav(){
+const data=makeBuffer();
+const sr=44100;
+const bytesPerSample=2;
+const dataLen=data.length*bytesPerSample;
+const header=new ArrayBuffer(44);
+const view=new DataView(header);
+writeStr(view,0,'RIFF');view.setUint32(4,36+dataLen,true);writeStr(view,8,'WAVE');
+writeStr(view,12,'fmt ');view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
+view.setUint32(24,sr,true);view.setUint32(28,sr*bytesPerSample,true);view.setUint16(32,bytesPerSample,true);view.setUint16(34,16,true);
+writeStr(view,36,'data');view.setUint32(40,dataLen,true);
+const wav=new Uint8Array(44+dataLen);
+new Uint8Array(header).forEach((b,i)=>wav[i]=b);
+for(let i=0;i<data.length;i++){
+const s=Math.max(-1,Math.min(1,data[i]));
+const int=s<0?s*0x8000:s*0x7FFF;
+wav[44+i*2]=int&255;
+wav[44+i*2+1]=(int>>8)&255;
+}
+return wav;
+}
+function writeStr(view,off,str){for(let i=0;i<str.length;i++)view.setUint8(off+i,str.charCodeAt(i));}
+function render(){
+rendered=renderToWav();
+$('out').textContent=`${current} rendered (${rendered.length} bytes).`;
+$('download').disabled=false;
+}
+function preview(){
+const data=makeBuffer();
+if(!ctx)ctx=new AudioContext();
+const buf=ctx.createBuffer(1,data.length,44100);
+buf.getChannelData(0).set(data);
+const src=ctx.createBufferSource();
+src.buffer=buf;
+src.connect(ctx.destination);
+src.start();
+}
+function exportWav(){
+if(!rendered)render();
+const blob=new Blob([rendered],{type:'audio/wav'});
+const url=URL.createObjectURL(blob);
+const a=document.createElement('a');
+a.href=url;a.download=`${current}-${$('pitch').value}-${$('decay').value}.wav`;
+a.click();URL.revokeObjectURL(url);
+}
+$('render').onclick=render;$('preview').onclick=preview;$('download').onclick=exportWav;
+</script>
+</body>
+</html>
