@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dark Techno Rhythm Generator</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: #0d0d0d;
+            color: #ddd;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 700px;
+            width: 100%;
+            background: #1a1a1a;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.8);
+            border: 1px solid #2a2a2a;
+        }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            margin-top: 0;
+            color: #b0b0b0;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #2a2a2a;
+            padding-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h1 span { background: #2a2a2a; padding: 2px 12px; border-radius: 20px; font-size: 0.8rem; color: #888; }
+        .control-group {
+            margin: 16px 0;
+        }
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            align-items: center;
+        }
+        .control-item {
+            flex: 1 0 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .control-item label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: #888;
+            letter-spacing: 0.5px;
+        }
+        .control-item input[type="range"] {
+            width: 100%;
+            background: #333;
+            height: 4px;
+            border-radius: 2px;
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+        }
+        .control-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #6a6a6a;
+            cursor: pointer;
+            border: 1px solid #444;
+        }
+        .control-item .value {
+            font-size: 0.9rem;
+            color: #aaa;
+            text-align: right;
+        }
+        .drum-prob {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            margin-top: 6px;
+        }
+        .drum-prob .dp-item {
+            flex: 1 0 80px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .drum-prob .dp-item label {
+            font-size: 0.7rem;
+            width: 40px;
+            color: #aaa;
+        }
+        .drum-prob .dp-item input[type="range"] {
+            flex: 1;
+            min-width: 40px;
+        }
+        .drum-prob .dp-item .val {
+            font-size: 0.8rem;
+            color: #ccc;
+            min-width: 24px;
+            text-align: right;
+        }
+        .pattern-preview {
+            background: #111;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 16px 0;
+            border: 1px solid #2a2a2a;
+            overflow-x: auto;
+        }
+        .pattern-preview .grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 2px;
+            margin-top: 4px;
+        }
+        .pattern-preview .grid .cell {
+            aspect-ratio: 1;
+            background: #222;
+            border-radius: 2px;
+            transition: background 0.1s;
+        }
+        .pattern-preview .grid .cell.active { background: #6a6a6a; }
+        .pattern-preview .row-label {
+            font-size: 0.6rem;
+            color: #666;
+            padding-right: 8px;
+            text-align: right;
+            width: 40px;
+            display: inline-block;
+        }
+        .pattern-preview .row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2px;
+        }
+        .btn {
+            background: #2a2a2a;
+            color: #ccc;
+            border: 1px solid #444;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            width: 100%;
+            margin-top: 12px;
+        }
+        .btn:hover { background: #3a3a3a; border-color: #666; }
+        .btn:active { transform: scale(0.97); }
+        .status {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #888;
+            text-align: center;
+            min-height: 1.5em;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.7rem;
+            color: #444;
+            text-align: center;
+            border-top: 1px solid #222;
+            padding-top: 12px;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .control-item { flex: 1 0 100%; }
+            .drum-prob .dp-item { flex: 1 0 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⛓️ Dark Techno Rhythm <span>generator</span></h1>
+    <div class="control-group">
+        <div class="control-row">
+            <div class="control-item">
+                <label>Bars</label>
+                <input type="range" id="bars" min="1" max="16" value="4" step="1">
+                <div class="value" id="barsVal">4</div>
+            </div>
+            <div class="control-item">
+                <label>Tempo (BPM)</label>
+                <input type="range" id="tempo" min="80" max="160" value="130" step="1">
+                <div class="value" id="tempoVal">130</div>
+            </div>
+            <div class="control-item">
+                <label>Swing (%)</label>
+                <input type="range" id="swing" min="50" max="75" value="60" step="1">
+                <div class="value" id="swingVal">60</div>
+            </div>
+        </div>
+    </div>
+    <div class="control-group">
+        <label style="font-size:0.75rem; text-transform:uppercase; color:#888;">Drum probabilities</label>
+        <div class="drum-prob">
+            <div class="dp-item"><label>Kick</label><input type="range" class="drum-slider" data-drum="kick" min="0" max="100" value="80"><span class="val" id="kickVal">80</span></div>
+            <div class="dp-item"><label>Snare</label><input type="range" class="drum-slider" data-drum="snare" min="0" max="100" value="60"><span class="val" id="snareVal">60</span></div>
+            <div class="dp-item"><label>Clap</label><input type="range" class="drum-slider" data-drum="clap" min="0" max="100" value="40"><span class="val" id="clapVal">40</span></div>
+            <div class="dp-item"><label>Closed Hat</label><input type="range" class="drum-slider" data-drum="ch" min="0" max="100" value="70"><span class="val" id="chVal">70</span></div>
+            <div class="dp-item"><label>Open Hat</label><input type="range" class="drum-slider" data-drum="oh" min="0" max="100" value="30"><span class="val" id="ohVal">30</span></div>
+            <div class="dp-item"><label>Perc</label><input type="range" class="drum-slider" data-drum="perc" min="0" max="100" value="25"><span class="val" id="percVal">25</span></div>
+        </div>
+    </div>
+    <div class="pattern-preview" id="preview">
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:6px;">
+            <span style="font-size:0.7rem; color:#666;">Pattern preview</span>
+            <span style="font-size:0.6rem; color:#444;">(generated on generate)</span>
+        </div>
+        <div id="gridContainer"></div>
+    </div>
+    <button class="btn" id="generateBtn">⟳ Generate MIDI Pattern</button>
+    <div class="status" id="status">Ready</div>
+    <div class="footer">MIDI file with drum pattern • drag into Ableton Live</div>
+</div>
+<script>
+    // UI bindings
+    const barsSlider = document.getElementById('bars');
+    const barsVal = document.getElementById('barsVal');
+    const tempoSlider = document.getElementById('tempo');
+    const tempoVal = document.getElementById('tempoVal');
+    const swingSlider = document.getElementById('swing');
+    const swingVal = document.getElementById('swingVal');
+    const drumSliders = document.querySelectorAll('.drum-slider');
+    const drumVals = {};
+    drumSliders.forEach(s => {
+        const id = s.dataset.drum;
+        const valSpan = document.getElementById(id+'Val');
+        drumVals[id] = { slider: s, span: valSpan };
+        s.addEventListener('input', () => { valSpan.textContent = s.value; });
+    });
+    barsSlider.addEventListener('input', () => { barsVal.textContent = barsSlider.value; });
+    tempoSlider.addEventListener('input', () => { tempoVal.textContent = tempoSlider.value; });
+    swingSlider.addEventListener('input', () => { swingVal.textContent = swingSlider.value; });
+
+    const gridContainer = document.getElementById('gridContainer');
+    const generateBtn = document.getElementById('generateBtn');
+    const statusDiv = document.getElementById('status');
+
+    // Drum mapping (GM)
+    const DRUM_NOTES = {
+        kick: 36,
+        snare: 38,
+        clap: 39,
+        ch: 42,
+        oh: 46,
+        perc: 49 // crash cymbal or other
+    };
+    const DRUM_NAMES = ['kick','snare','clap','ch','oh','perc'];
+
+    function generatePattern() {
+        const bars = parseInt(barsSlider.value);
+        const tempo = parseInt(tempoSlider.value);
+        const swing = parseInt(swingSlider.value) / 100;
+        const probs = {};
+        DRUM_NAMES.forEach(d => {
+            probs[d] = parseInt(drumVals[d].slider.value) / 100;
+        });
+        const stepsPerBar = 16;
+        const totalSteps = bars * stepsPerBar;
+        // Generate pattern: array of objects { step, note, velocity }
+        let events = [];
+        // For each step, for each drum, random trigger
+        for (let step = 0; step < totalSteps; step++) {
+            // Apply swing: shift even steps? Simple swing: delay every second 16th note by swing amount
+            const beatIndex = step % stepsPerBar;
+            const isEven = beatIndex % 2 === 0;
+            let timeOffset = 0;
+            if (!isEven) {
+                // Swing: shift off-beat by swing * 0.125? Actually we want to shift later.
+                // We'll handle in MIDI timing later.
+                timeOffset = swing * 0.125; // 1/8 note shift
+            }
+            const baseTime = step / (stepsPerBar / 4); // in beats
+            const time = baseTime + timeOffset;
+            for (const drum of DRUM_NAMES) {
+                if (Math.random() < probs[drum]) {
+                    // Add some velocity variation
+                    const vel = Math.floor(80 + Math.random() * 40);
+                    events.push({ time: time, note: DRUM_NOTES[drum], velocity: vel });
+                }
+            }
+        }
+        // Sort by time
+        events.sort((a,b) => a.time - b.time);
+        return { events, tempo, bars };
+    }
+
+    function generateMIDI(events, tempo, bars) {
+        // Build a simple MIDI file (type 1 with one track)
+        const division = 480; // PPQ
+        const ticksPerBeat = division;
+        const ticksPerBar = ticksPerBeat * 4; // 4/4
+        const totalTicks = bars * ticksPerBar;
+
+        // MIDI file header
+        const header = [0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x01, 0x00, 0x01, 0x01, 0xE0]; // format 1, 1 track, division 480
+        // Track header
+        const trackHeader = [0x4D, 0x54, 0x72, 0x6B];
+        // We'll build track data
+        let trackData = [];
+        // Tempo event: convert BPM to microseconds per quarter note
+        const microPerBeat = 60000000 / tempo;
+        const tempoBytes = [];
+        let val = microPerBeat;
+        tempoBytes.push((val >> 16) & 0xFF);
+        tempoBytes.push((val >> 8) & 0xFF);
+        tempoBytes.push(val & 0xFF);
+        // Set tempo at tick 0
+        trackData.push(0x00, 0xFF, 0x51, 0x03, ...tempoBytes);
+        // Time signature: 4/4
+        trackData.push(0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
+        // End of track
+        // We'll add note events
+        // Sort events by time
+        const sorted = events.slice().sort((a,b) => a.time - b.time);
+        let lastTick = 0;
+        for (const ev of sorted) {
+            const tick = Math.round(ev.time * ticksPerBeat);
+            const delta = tick - lastTick;
+            lastTick = tick;
+            // Delta time as variable length
+            const deltaBytes = writeVarLen(delta);
+            // Note on: 0x90 + channel 0, note, velocity
+            const noteOn = [0x90, ev.note, Math.min(ev.velocity, 127)];
+            // Note off: after 1/16 note duration (assuming 1/16 note length)
+            const dur = ticksPerBeat / 4; // 1/16 note
+            const offTick = tick + dur;
+            const deltaOff = offTick - tick;
+            const offBytes = writeVarLen(deltaOff);
+            const noteOff = [0x80, ev.note, 0];
+            trackData.push(...deltaBytes, ...noteOn, ...offBytes, ...noteOff);
+        }
+        // End of track: delta 0, meta event 0x2F 0x00
+        trackData.push(0x00, 0xFF, 0x2F, 0x00);
+
+        // Build track chunk
+        const trackChunk = [...trackHeader];
+        const trackLen = trackData.length;
+        trackChunk.push((trackLen >> 24) & 0xFF, (trackLen >> 16) & 0xFF, (trackLen >> 8) & 0xFF, trackLen & 0xFF);
+        trackChunk.push(...trackData);
+
+        const full = [...header, ...trackChunk];
+        return new Uint8Array(full);
+    }
+
+    function writeVarLen(value) {
+        if (value < 0) return [];
+        let buffer = [];
+        buffer.push(value & 0x7F);
+        value >>= 7;
+        while (value > 0) {
+            buffer.unshift((value & 0x7F) | 0x80);
+            value >>= 7;
+        }
+        return buffer;
+    }
+
+    function renderPreview(events, bars) {
+        // Simple grid: rows for each drum, columns for 16 steps per bar, but we show only first bar? Show all bars.
+        const stepsPerBar = 16;
+        const totalSteps = bars * stepsPerBar;
+        // Create grid of cells for each drum and step
+        const drumOrder = ['kick','snare','clap','ch','oh','perc'];
+        const grid = {};
+        drumOrder.forEach(d => grid[d] = new Array(totalSteps).fill(false));
+        // Mark events
+        for (const ev of events) {
+            const step = Math.round(ev.time * (stepsPerBar/4)); // convert beats to step index
+            if (step >= 0 && step < totalSteps) {
+                const drum = Object.keys(DRUM_NOTES).find(key => DRUM_NOTES[key] === ev.note);
+                if (drum && grid[drum]) grid[drum][step] = true;
+            }
+        }
+        // Render
+        let html = '';
+        for (const drum of drumOrder) {
+            html += `<div class="row"><span class="row-label">${drum.slice(0,3)}</span>`;
+            for (let i=0; i<totalSteps; i++) {
+                const active = grid[drum][i] ? 'active' : '';
+                html += `<div class="cell ${active}"></div>`;
+            }
+            html += '</div>';
+        }
+        gridContainer.innerHTML = html;
+    }
+
+    function downloadMIDI(data, filename) {
+        const blob = new Blob([data], { type: 'audio/midi' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename || 'pattern.mid';
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    generateBtn.addEventListener('click', () => {
+        const { events, tempo, bars } = generatePattern();
+        renderPreview(events, bars);
+        const midiData = generateMIDI(events, tempo, bars);
+        const filename = `dark_techno_${bars}bars_${tempo}bpm.mid`;
+        downloadMIDI(midiData, filename);
+        statusDiv.textContent = `✓ Pattern generated: ${events.length} events, ${bars} bars, ${tempo} BPM`;
+    });
+
+    // Initial preview
+    (function init() {
+        const { events, tempo, bars } = generatePattern();
+        renderPreview(events, bars);
+        statusDiv.textContent = 'Click generate to create a new pattern';
+    })();
+</script>
+</body>
+</html>

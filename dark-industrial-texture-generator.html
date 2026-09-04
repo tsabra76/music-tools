@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dark Industrial Texture Generator</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            background: #0a0a0a;
+            color: #ccc;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container {
+            max-width: 720px;
+            width: 100%;
+            background: #161616;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #2a2a2a;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.9);
+        }
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #aaa;
+            border-bottom: 1px solid #2a2a2a;
+            padding-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h1 span { background: #222; padding: 2px 12px; border-radius: 20px; font-size: 0.7rem; color: #666; }
+        .control-group {
+            margin: 16px 0;
+        }
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 20px;
+            align-items: center;
+        }
+        .control-item {
+            flex: 1 0 120px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .control-item label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #888;
+            letter-spacing: 0.5px;
+        }
+        .control-item input[type="range"] {
+            width: 100%;
+            background: #333;
+            height: 4px;
+            border-radius: 2px;
+            -webkit-appearance: none;
+            appearance: none;
+            outline: none;
+        }
+        .control-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #6a6a6a;
+            cursor: pointer;
+            border: 1px solid #444;
+        }
+        .control-item .value {
+            font-size: 0.9rem;
+            color: #aaa;
+            text-align: right;
+        }
+        select {
+            background: #222;
+            color: #ccc;
+            border: 1px solid #444;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .btn {
+            background: #2a2a2a;
+            color: #ccc;
+            border: 1px solid #444;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            margin-top: 8px;
+            width: 100%;
+        }
+        .btn:hover { background: #3a3a3a; border-color: #666; }
+        .btn:active { transform: scale(0.97); }
+        .btn.primary { background: #3a3a3a; border-color: #666; }
+        .btn.primary:hover { background: #4a4a4a; }
+        .status {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: #888;
+            text-align: center;
+            min-height: 1.5em;
+        }
+        .footer {
+            margin-top: 20px;
+            font-size: 0.7rem;
+            color: #444;
+            text-align: center;
+            border-top: 1px solid #222;
+            padding-top: 12px;
+        }
+        .visualizer {
+            width: 100%;
+            height: 60px;
+            background: #111;
+            border-radius: 8px;
+            margin: 12px 0;
+            border: 1px solid #2a2a2a;
+            overflow: hidden;
+        }
+        .visualizer canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .export-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        .export-group .control-item {
+            flex: 1;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            .control-item { flex: 1 0 100%; }
+            .export-group { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⚙️ Dark Industrial Texture <span>generator</span></h1>
+    <div class="control-group">
+        <div class="control-row">
+            <div class="control-item">
+                <label>Noise type</label>
+                <select id="noiseType">
+                    <option value="white">White</option>
+                    <option value="pink" selected>Pink</option>
+                    <option value="brown">Brown</option>
+                </select>
+            </div>
+            <div class="control-item">
+                <label>Modulation (LFO rate)</label>
+                <input type="range" id="lfoRate" min="0.1" max="10" step="0.1" value="0.5" />
+                <div class="value" id="lfoRateVal">0.5 Hz</div>
+            </div>
+            <div class="control-item">
+                <label>Modulation depth</label>
+                <input type="range" id="lfoDepth" min="0" max="100" step="1" value="40" />
+                <div class="value" id="lfoDepthVal">40%</div>
+            </div>
+        </div>
+        <div class="control-row">
+            <div class="control-item">
+                <label>Filter cutoff</label>
+                <input type="range" id="cutoff" min="20" max="8000" step="10" value="800" />
+                <div class="value" id="cutoffVal">800 Hz</div>
+            </div>
+            <div class="control-item">
+                <label>Resonance</label>
+                <input type="range" id="resonance" min="0" max="100" step="1" value="30" />
+                <div class="value" id="resonanceVal">30%</div>
+            </div>
+            <div class="control-item">
+                <label>Distortion</label>
+                <input type="range" id="distortion" min="0" max="100" step="1" value="20" />
+                <div class="value" id="distortionVal">20%</div>
+            </div>
+        </div>
+        <div class="control-row">
+            <div class="control-item">
+                <label>Duration (seconds)</label>
+                <input type="range" id="duration" min="2" max="60" step="1" value="8" />
+                <div class="value" id="durationVal">8s</div>
+            </div>
+            <div class="control-item">
+                <label>Output format</label>
+                <select id="outputFormat">
+                    <option value="wav">WAV</option>
+                    <option value="mp3">MP3 (fallback to WAV)</option>
+                </select>
+            </div>
+            <div class="control-item">
+                <label>&nbsp;</label>
+                <button class="btn primary" id="generateBtn">▶ Generate & Export</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="visualizer">
+        <canvas id="visualizerCanvas"></canvas>
+    </div>
+    <div class="status" id="status">Ready</div>
+    <div class="footer">Generates industrial drone textures • drag into Ableton Live</div>
+</div>
+<script>
+    // UI bindings
+    const noiseTypeSel = document.getElementById('noiseType');
+    const lfoRateSlider = document.getElementById('lfoRate');
+    const lfoRateVal = document.getElementById('lfoRateVal');
+    const lfoDepthSlider = document.getElementById('lfoDepth');
+    const lfoDepthVal = document.getElementById('lfoDepthVal');
+    const cutoffSlider = document.getElementById('cutoff');
+    const cutoffVal = document.getElementById('cutoffVal');
+    const resonanceSlider = document.getElementById('resonance');
+    const resonanceVal = document.getElementById('resonanceVal');
+    const distortionSlider = document.getElementById('distortion');
+    const distortionVal = document.getElementById('distortionVal');
+    const durationSlider = document.getElementById('duration');
+    const durationVal = document.getElementById('durationVal');
+    const outputFormatSel = document.getElementById('outputFormat');
+    const generateBtn = document.getElementById('generateBtn');
+    const statusDiv = document.getElementById('status');
+    const canvas = document.getElementById('visualizerCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width || 600;
+        canvas.height = 60;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Update value displays
+    lfoRateSlider.addEventListener('input', () => { lfoRateVal.textContent = parseFloat(lfoRateSlider.value).toFixed(1) + ' Hz'; });
+    lfoDepthSlider.addEventListener('input', () => { lfoDepthVal.textContent = lfoDepthSlider.value + '%'; });
+    cutoffSlider.addEventListener('input', () => { cutoffVal.textContent = cutoffSlider.value + ' Hz'; });
+    resonanceSlider.addEventListener('input', () => { resonanceVal.textContent = resonanceSlider.value + '%'; });
+    distortionSlider.addEventListener('input', () => { distortionVal.textContent = distortionSlider.value + '%'; });
+    durationSlider.addEventListener('input', () => { durationVal.textContent = durationSlider.value + 's'; });
+
+    // Web Audio
+    let audioContext = null;
+    let source = null;
+    let gainNode = null;
+    let filterNode = null;
+    let lfoNode = null;
+    let analyser = null;
+    let animationId = null;
+    let isGenerating = false;
+
+    function getNoiseBuffer(context, type, duration) {
+        const sampleRate = context.sampleRate;
+        const length = sampleRate * duration;
+        const buffer = context.createBuffer(1, length, sampleRate);
+        const data = buffer.getChannelData(0);
+        let lastOut = 0;
+        let brown = 0;
+        for (let i = 0; i < length; i++) {
+            let val = 0;
+            if (type === 'white') {
+                val = Math.random() * 2 - 1;
+            } else if (type === 'pink') {
+                let white = Math.random() * 2 - 1;
+                val = (white + lastOut) / 1.414;
+                lastOut = val;
+            } else if (type === 'brown') {
+                let white = Math.random() * 2 - 1;
+                brown = (brown + 0.02 * white) / 1.02;
+                val = brown;
+            }
+            data[i] = val;
+        }
+        return buffer;
+    }
+
+    function generateTexture() {
+        if (isGenerating) return;
+        isGenerating = true;
+        generateBtn.textContent = '⏳ Generating...';
+        generateBtn.disabled = true;
+        statusDiv.textContent = 'Generating texture...';
+
+        const duration = parseFloat(durationSlider.value);
+        const noiseType = noiseTypeSel.value;
+        const lfoRate = parseFloat(lfoRateSlider.value);
+        const lfoDepth = parseFloat(lfoDepthSlider.value) / 100;
+        const cutoff = parseFloat(cutoffSlider.value);
+        const resonance = parseFloat(resonanceSlider.value) / 100;
+        const distortion = parseFloat(distortionSlider.value) / 100;
+        const format = outputFormatSel.value;
+
+        // Create offline context
+        const sampleRate = 44100;
+        const offlineCtx = new OfflineAudioContext(2, sampleRate * duration, sampleRate);
+
+        // Generate noise buffer
+        const noiseBuffer = getNoiseBuffer(offlineCtx, noiseType, duration);
+        const sourceNode = offlineCtx.createBufferSource();
+        sourceNode.buffer = noiseBuffer;
+
+        // LFO for modulation (filter cutoff modulation)
+        const lfo = offlineCtx.createOscillator();
+        lfo.frequency.value = lfoRate;
+        const lfoGain = offlineCtx.createGain();
+        lfoGain.gain.value = cutoff * lfoDepth * 0.8; // modulate up to 80% of cutoff
+        lfo.connect(lfoGain);
+        // We'll modulate filter frequency directly via automation
+
+        // Filter
+        const filter = offlineCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = cutoff;
+        filter.Q.value = resonance * 10 + 0.1;
+
+        // Distortion (waveshaper)
+        const waveshaper = offlineCtx.createWaveShaper();
+        const curve = new Float32Array(44100);
+        const k = distortion * 5;
+        for (let i = 0; i < curve.length; i++) {
+            const x = (i / curve.length) * 2 - 1;
+            curve[i] = (1 + k) * x / (1 + k * Math.abs(x));
+        }
+        waveshaper.curve = curve;
+        waveshaper.oversample = '4x';
+
+        // Gain
+        const gain = offlineCtx.createGain();
+        gain.gain.value = 0.5;
+
+        // Connect
+        sourceNode.connect(filter);
+        filter.connect(waveshaper);
+        waveshaper.connect(gain);
+        gain.connect(offlineCtx.destination);
+
+        // Schedule filter modulation
+        const now = offlineCtx.currentTime;
+        const modAmount = cutoff * lfoDepth * 0.8;
+        const freqBase = cutoff;
+        const steps = 1000;
+        for (let i = 0; i < steps; i++) {
+            const t = (i / steps) * duration;
+            const val = freqBase + modAmount * Math.sin(2 * Math.PI * lfoRate * t);
+            filter.frequency.setValueAtTime(Math.max(20, val), now + t);
+        }
+
+        sourceNode.start(0);
+        sourceNode.stop(duration);
+        lfo.start(0);
+        lfo.stop(duration);
+
+        // Render
+        offlineCtx.startRendering().then(renderedBuffer => {
+            // Export
+            const blob = renderBufferToBlob(renderedBuffer, format);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const ext = format === 'mp3' ? 'mp3' : 'wav';
+            a.download = `industrial_texture_${duration}s.${ext}`;
+            a.click();
+            URL.revokeObjectURL(url);
+            statusDiv.textContent = `✓ Exported ${format.toUpperCase()} (${duration}s)`;
+            isGenerating = false;
+            generateBtn.textContent = '▶ Generate & Export';
+            generateBtn.disabled = false;
+            // Visualize the rendered buffer
+            visualizeBuffer(renderedBuffer);
+        }).catch(err => {
+            statusDiv.textContent = '❌ Error: ' + err.message;
+            isGenerating = false;
+            generateBtn.textContent = '▶ Generate & Export';
+            generateBtn.disabled = false;
+        });
+    }
+
+    function renderBufferToBlob(buffer, format) {
+        // For WAV export
+        if (format === 'wav') {
+            return wavBlob(buffer);
+        } else {
+            // MP3 fallback to WAV
+            statusDiv.textContent = '⚠️ MP3 export not fully supported in this browser; using WAV.';
+            return wavBlob(buffer);
+        }
+    }
+
+    function wavBlob(buffer) {
+        const numChannels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const length = buffer.length;
+        const data = buffer.getChannelData(0);
+        let interleaved;
+        if (numChannels === 2) {
+            const data2 = buffer.getChannelData(1);
+            interleaved = new Float32Array(length * 2);
+            for (let i = 0; i < length; i++) {
+                interleaved[2*i] = data[i];
+                interleaved[2*i+1] = data2[i];
+            }
+        } else {
+            interleaved = data;
+        }
+        const pcm = new Int16Array(interleaved.length);
+        for (let i = 0; i < interleaved.length; i++) {
+            const s = Math.max(-1, Math.min(1, interleaved[i]));
+            pcm[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        const header = new ArrayBuffer(44);
+        const view = new DataView(header);
+        view.setUint32(0, 0x52494646, true);
+        view.setUint32(4, 36 + pcm.length * 2, true);
+        view.setUint32(8, 0x57415645, true);
+        view.setUint32(12, 0x666D7420, true);
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numChannels * 2, true);
+        view.setUint16(32, numChannels * 2, true);
+        view.setUint16(34, 16, true);
+        view.setUint32(36, 0x64617461, true);
+        view.setUint32(40, pcm.length * 2, true);
+        return new Blob([header, pcm.buffer], { type: 'audio/wav' });
+    }
+
+    function visualizeBuffer(buffer) {
+        const data = buffer.getChannelData(0);
+        const len = data.length;
+        const step = Math.floor(len / canvas.width);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        for (let i = 0; i < canvas.width; i++) {
+            const idx = i * step;
+            const val = data[idx] || 0;
+            const y = canvas.height/2 + val * canvas.height/2;
+            if (i === 0) ctx.moveTo(i, y);
+            else ctx.lineTo(i, y);
+        }
+        ctx.strokeStyle = '#6a6a6a';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    }
+
+    generateBtn.addEventListener('click', generateTexture);
+
+    // Initial visualizer draw
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#333';
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height/2);
+    ctx.lineTo(canvas.width, canvas.height/2);
+    ctx.stroke();
+    statusDiv.textContent = 'Ready';
+</script>
+</body>
+</html>
